@@ -10,6 +10,7 @@ import (
 var (
 	Port         string
 	GitHubApiUrl string
+	GitHubToken  string
 )
 
 func Env() error {
@@ -18,6 +19,7 @@ func Env() error {
 	}
 
 	GitHubApiUrl = os.Getenv("API_GITHUB_URL")
+	GitHubToken = os.Getenv("API_GITHUB_TOKEN")
 	Port = os.Getenv("PORT")
 
 	return nil

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/pgsilva/go-github/internal/model/domain"
@@ -31,7 +32,7 @@ func SearchUsers(query string) ([]domain.GoHubSearchResponse, error) {
 			return []domain.GoHubSearchResponse{}, err
 		}
 
-		followingQtd, err := getQuantity(item.FollowingURL)
+		followingQtd, err := getQuantity(strings.TrimSuffix(item.FollowingURL, "{/other_user}"))
 		if err != nil {
 			slog.Error("Error getting following quantity", "err", err)
 			return []domain.GoHubSearchResponse{}, err
@@ -102,6 +103,8 @@ func makeSearchRequest(query string) (*http.Request, error) {
 		return nil, err
 	}
 
+	addHeaders(req)
+
 	return req, nil
 }
 
@@ -121,17 +124,25 @@ func getQuantity(path string) (int, error) {
 		return 0, err
 	}
 
+	addHeaders(req)
+
 	resp, err := client.Do(req)
 	if err != nil {
 		slog.Error("Error calling GitHub API", "err", err)
 		return 0, err
 	}
 
-	var result []map[string]interface{}
+	var result []struct {
+		ID       int    `json:"id"`
+		Username string `json:"login"`
+	}
+
 	if err := json.Unmarshal(resp, &result); err != nil {
 		slog.Error("Error decoding JSON", "err", err)
 		return 0, err
 	}
+
+	slog.Info("Quantity", "quantity", len(result), "url", path)
 
 	return len(result), nil
 
@@ -152,6 +163,8 @@ func getRepos(path string) ([]domain.GoHubSearchRepositorieItem, error) {
 		slog.Error("Error building request", "err", err)
 		return []domain.GoHubSearchRepositorieItem{}, err
 	}
+
+	addHeaders(req)
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -179,4 +192,10 @@ func getRepos(path string) ([]domain.GoHubSearchRepositorieItem, error) {
 	}
 
 	return listRepos, nil
+}
+
+func addHeaders(req *http.Request) {
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	req.Header.Set("User-Agent", "go-github")
+	req.Header.Set("Authorization", "Bearer "+config.GitHubToken)
 }
